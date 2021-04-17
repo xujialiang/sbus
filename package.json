@@ -1,0 +1,29 @@
+{
+  "name": "sbusuart",
+  "version": "1.0.1",
+  "description": "",
+  "main": "sbus.js",
+  "dependencies": {
+    "serialport": "^9.0.7"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "run": "node example.js",
+    "test": "node example.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xujialiang/sbus.git"
+  },
+  "keywords": [
+    "sbus",
+    "s.bus",
+    "sbusreceiver"
+  ],
+  "author": "xujialiang",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/xujialiang/sbus/issues"
+  },
+  "homepage": "https://github.com/xujialiang/sbus#readme"
+}
