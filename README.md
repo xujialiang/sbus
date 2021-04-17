@@ -2,6 +2,16 @@
 
 用于接收和解析遥控器接收机的SBUS输出信号
 
+### 安装 
+
+
+```shell
+
+npm install sbusuart --save
+
+```
+
+
 ### 初始化
 
 ```javascript
