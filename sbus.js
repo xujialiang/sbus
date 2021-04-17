@@ -1,7 +1,7 @@
 const SerialPort = require('serialport')
 
-const START_BYTE = '0f';
-const END_BYTE = '00';
+const START_BYTE = 0x0f;
+const END_BYTE = 0x00;
 const SBUS_FRAME_LEN = 25; // SBUS帧，默认25个字节
 const SBUS_NUM_CHANNELS = 18;
 const SBUS_SIGNAL_OK = 0; // 信号正常为0
@@ -16,7 +16,6 @@ class SBUSUART {
         this.SBUS_FRAME_LEN= sbus_frame_len;
         this.SBUS_NUM_CHANNELS= sbus_num_channels;
         this.sbusFrame = Buffer(this.SBUS_FRAME_LEN)  // SBUS数据帧，默认25个字节
-        this.sbusFrameArray = [];
         this.baudRate = baudRate;
         this.stopBits = stopBits;
         this.parity = parity;
@@ -66,91 +65,77 @@ class SBUSUART {
         // Open errors will be emitted as an error event
         this.port.on('error', function(err) {
             console.error('Error: ', err.message)
-            if(errcallback){
+            if(errcallback){s
                 errcallback(err);
             }
         });
 
         this.port.on('readable', function () {
-            // 每次读一个字节，放自己的缓存队列。
-            var data = that.port.read(1);
-            // console.debug('Data:', data, data.toString('hex'));
-            if(that.sbusFrameArray.length<that.SBUS_FRAME_LEN){
-                that.sbusFrameArray.push(data);
-            }else{
-                let subArr = that.sbusFrameArray.slice(1);
-                subArr.push(data);
-                that.sbusFrameArray = subArr;
-                // 解码
-                that.decodeSBUSFrame(that.sbusFrameArray,callback);
-            }
-            // console.debug('ALl Data:', new Date(),that.sbusFrameArray);
-            
+            that.port.read();
         });
+        this.port.on('data', function(data) {
+            if(data.byteLength == 25 && !(data[0] ^ that.START_BYTE)  && !(data[that.SBUS_FRAME_LEN-1] ^ that.END_BYTE)){
+                that.sbusFrame = data;
+            }
+        });
+
+        setInterval(() => {
+            that.decodeSBUSFrame(that.sbusFrame, callback)
+        }, 100);
     }
 
-    decodeSBUSFrame(data,callback){
+    decodeSBUSFrame(sbusFrames, callback){
         // 判断是否以0f开头， 00结尾
-        if(data[0].toString('hex') == this.START_BYTE && data[this.SBUS_FRAME_LEN-1].toString('hex') == this.END_BYTE){
-            
-            var sbusFrameIntArr = [];
-            data.forEach(buf=>{
-                sbusFrameIntArr.push(parseInt(buf[0]));
-            });
-            console.debug('解析SBUS.Frame:', sbusFrameIntArr);
-            // # CH1 = [data2]的低3位 + [data1]的8位（678+12345678 = 678,12345678）
-            this.sbusChannels[0] = (sbusFrameIntArr[1] | sbusFrameIntArr[2] << 8) & 0x07FF;
-            // # CH2 = [data3]的低6位 + [data2]的高5位（345678+12345 = 345678,12345 ）
-            this.sbusChannels[1] = (sbusFrameIntArr[2] >> 3 | sbusFrameIntArr[3] << 5) & 0x07FF;
-            // # CH3 = [data5]的低1位 + [data4]的8位 + [data3]的高2位（8+12345678+12 = 8,12345678,12）
-            this.sbusChannels[2] = (sbusFrameIntArr[3] >> 6 | sbusFrameIntArr[4] << 2 | sbusFrameIntArr[5] << 10) & 0x07FF;
-            this.sbusChannels[3] = (sbusFrameIntArr[5] >> 1 | sbusFrameIntArr[6] << 7) & 0x07FF;
-            this.sbusChannels[4] = (sbusFrameIntArr[6] >> 4 | sbusFrameIntArr[7] << 4) & 0x07FF;
-            this.sbusChannels[5] = (sbusFrameIntArr[7] >> 7 | sbusFrameIntArr[8] << 1 | sbusFrameIntArr[9] << 9) & 0x07FF;
-            this.sbusChannels[6] = (sbusFrameIntArr[9] >> 2 | sbusFrameIntArr[10] << 6) & 0x07FF;
-            this.sbusChannels[7] = (sbusFrameIntArr[10] >> 5 | sbusFrameIntArr[11] << 3) & 0x07FF;
-            this.sbusChannels[8] = (sbusFrameIntArr[12] | sbusFrameIntArr[13] << 8) & 0x07FF;
-            this.sbusChannels[9] = (sbusFrameIntArr[13] >> 3 | sbusFrameIntArr[14] << 5) & 0x07FF;
-            this.sbusChannels[10] = (sbusFrameIntArr[14] >> 6 | sbusFrameIntArr[15] << 2 | sbusFrameIntArr[16] << 10) & 0x07FF;
-            this.sbusChannels[11] = (sbusFrameIntArr[16] >> 1 | sbusFrameIntArr[17] << 7) & 0x07FF;
-            this.sbusChannels[12] = (sbusFrameIntArr[17] >> 4 | sbusFrameIntArr[18] << 4) & 0x07FF;
-            this.sbusChannels[13] = (sbusFrameIntArr[18] >> 7 | sbusFrameIntArr[19] << 1 | sbusFrameIntArr[20] << 9) & 0x07FF;
-            this.sbusChannels[14] = (sbusFrameIntArr[20] >> 2 | sbusFrameIntArr[21] << 6) & 0x07FF;
-            this.sbusChannels[15] = (sbusFrameIntArr[21] >> 5 | sbusFrameIntArr[22] << 3) & 0x07FF;
+        // console.debug('解析SBUS.Frame:', sbusFrameIntArr);
+        this.sbusChannels[0] = (sbusFrames[1] | sbusFrames[2] << 8) & 0x07FF;
+        this.sbusChannels[1] = (sbusFrames[2] >> 3 | sbusFrames[3] << 5) & 0x07FF;
+        this.sbusChannels[2] = (sbusFrames[3] >> 6 | sbusFrames[4] << 2 | sbusFrames[5] << 10) & 0x07FF;
+        this.sbusChannels[3] = (sbusFrames[5] >> 1 | sbusFrames[6] << 7) & 0x07FF;
+        this.sbusChannels[4] = (sbusFrames[6] >> 4 | sbusFrames[7] << 4) & 0x07FF;
+        this.sbusChannels[5] = (sbusFrames[7] >> 7 | sbusFrames[8] << 1 | sbusFrames[9] << 9) & 0x07FF;
+        this.sbusChannels[6] = (sbusFrames[9] >> 2 | sbusFrames[10] << 6) & 0x07FF;
+        this.sbusChannels[7] = (sbusFrames[10] >> 5 | sbusFrames[11] << 3) & 0x07FF;
+        this.sbusChannels[8] = (sbusFrames[12] | sbusFrames[13] << 8) & 0x07FF;
+        this.sbusChannels[9] = (sbusFrames[13] >> 3 | sbusFrames[14] << 5) & 0x07FF;
+        this.sbusChannels[10] = (sbusFrames[14] >> 6 | sbusFrames[15] << 2 | sbusFrames[16] << 10) & 0x07FF;
+        this.sbusChannels[11] = (sbusFrames[16] >> 1 | sbusFrames[17] << 7) & 0x07FF;
+        this.sbusChannels[12] = (sbusFrames[17] >> 4 | sbusFrames[18] << 4) & 0x07FF;
+        this.sbusChannels[13] = (sbusFrames[18] >> 7 | sbusFrames[19] << 1 | sbusFrames[20] << 9) & 0x07FF;
+        this.sbusChannels[14] = (sbusFrames[20] >> 2 | sbusFrames[21] << 6) & 0x07FF;
+        this.sbusChannels[15] = (sbusFrames[21] >> 5 | sbusFrames[22] << 3) & 0x07FF;
 
-            // # 17频道，第24字节的最低一位
-            if(sbusFrameIntArr[23] & 0x0001){
-                this.sbusChannels[16] = 2047;
-            }else{
-                this.sbusChannels[16] = 0
-            }
-            // # 18频道，第24字节的低第二位，所以要右移一位
-            if(sbusFrameIntArr[23] >> 1 & 0x0001){
-                this.sbusChannels[17] = 2047;
-            }else{
-                this.sbusChannels[17] = 0
-            }
-
-            // # 帧丢失位为1时，第24字节的低第三位，与0x04进行与运算
-            this.failSafeStatus = SBUS_SIGNAL_OK
-            if (sbusFrameIntArr[23] & (1 << 2)){
-                this.failSafeStatus = this.SBUS_SIGNAL_LOST
-            }
-            // # 故障保护激活位为1时，第24字节的低第四位，与0x08进行与运算
-            if (sbusFrameIntArr[23] & (1 << 3)){
-                this.failSafeStatus = this.SBUS_SIGNAL_FAILSAFE
-            }
-
-            if(callback){
-                if(this.channel_min && this.channel_max){
-                    for (let index = 0; index < this.sbusChannels.length; index++) {
-                        const data = this.sbusChannels[index];
-                        this.sbusChannels_c[index] = this._convert(data, this.channel_min, this.channel_max)
-                    }
-                }
-                callback(this.failSafeStatus, this.sbusChannels, this.sbusChannels_c);
-            }
+        // # 17频道，第24字节的最低一位
+        if(sbusFrames[23] & 0x0001){
+            this.sbusChannels[16] = 2047;
+        }else{
+            this.sbusChannels[16] = 0
         }
+        // # 18频道，第24字节的低第二位，所以要右移一位
+        if(sbusFrames[23] >> 1 & 0x0001){
+            this.sbusChannels[17] = 2047;
+        }else{
+            this.sbusChannels[17] = 0
+        }
+
+        // # 帧丢失位为1时，第24字节的低第三位，与0x04进行与运算
+        this.failSafeStatus = SBUS_SIGNAL_OK
+        if (sbusFrames[23] & (1 << 2)){
+            this.failSafeStatus = this.SBUS_SIGNAL_LOST
+        }
+        // # 故障保护激活位为1时，第24字节的低第四位，与0x08进行与运算
+        if (sbusFrames[23] & (1 << 3)){
+            this.failSafeStatus = this.SBUS_SIGNAL_FAILSAFE
+        }
+
+        if(callback){
+            if(this.channel_min && this.channel_max){
+                for (let index = 0; index < this.sbusChannels.length; index++) {
+                    const data = this.sbusChannels[index];
+                    this.sbusChannels_c[index] = this._convert(data, this.channel_min, this.channel_max)
+                }
+            }
+            callback(this.failSafeStatus, this.sbusChannels, this.sbusChannels_c);
+        }   
     }
 
     _convert(x, min, max){
