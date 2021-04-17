@@ -1,7 +1,7 @@
 const SerialPort = require('serialport')
 
-const START_BYTE = 0x0f;
-const END_BYTE = 0x00;
+const START_BYTE = '0f';
+const END_BYTE = '00';
 const SBUS_FRAME_LEN = 25; // SBUS帧，默认25个字节
 const SBUS_NUM_CHANNELS = 18;
 const SBUS_SIGNAL_OK = 0; // 信号正常为0
@@ -23,7 +23,22 @@ class SBUSUART {
         this.dataBits = dataBits;
 
         this.sbusChannels = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; //数据通道默认值
+        this.sbusChannels_c = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; //数据通道默认值
+
         this.failSafeStatus = SBUS_SIGNAL_FAILSAFE; // 默认状态
+    }
+
+    setupConvertParams(channel_min, channel_max){
+        this.channel_max = channel_max;
+        this.channel_min = channel_min;
+    }
+
+    listDevice(callback,errcallback){
+        SerialPort.list().then(ports=>{
+            callback(ports);
+        }).catch(err=>{
+            errcallback(err);
+        });
     }
 
     start(port='/dev/tty.usbserial-00003314B', callback, errcallback){
@@ -76,7 +91,7 @@ class SBUSUART {
 
     decodeSBUSFrame(data,callback){
         // 判断是否以0f开头， 00结尾
-        if(data[0].toString('hex') == '0f' && data[this.SBUS_FRAME_LEN-1].toString('hex') == '00'){
+        if(data[0].toString('hex') == this.START_BYTE && data[this.SBUS_FRAME_LEN-1].toString('hex') == this.END_BYTE){
             
             var sbusFrameIntArr = [];
             data.forEach(buf=>{
@@ -127,10 +142,24 @@ class SBUSUART {
             }
 
             if(callback){
-                callback(this.failSafeStatus, this.sbusChannels);
+                if(this.channel_min && this.channel_max){
+                    for (let index = 0; index < this.sbusChannels.length; index++) {
+                        const data = this.sbusChannels[index];
+                        this.sbusChannels_c[index] = this._convert(data, this.channel_min, this.channel_max)
+                    }
+                }
+                callback(this.failSafeStatus, this.sbusChannels, this.sbusChannels_c);
             }
         }
     }
+
+    _convert(x, min, max){
+        if(x<=min){
+            return 0;
+        }
+        return (x - min)/(max - min);
+    }
+
 }
 
 module.exports = SBUSUART;
