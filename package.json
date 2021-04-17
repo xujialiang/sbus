@@ -1,8 +1,8 @@
 {
   "name": "sbusuart",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "",
-  "main": "example.js",
+  "main": "sbus.js",
   "dependencies": {
     "serialport": "^9.0.7"
   },
