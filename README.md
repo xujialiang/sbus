@@ -17,7 +17,7 @@ npm install sbusuart --save
 ### 初始化
 
 ```javascript
-const SerialPort = require('serialport')
+const SBUSUART = require('sbusuart')
 
 var sbus = new SBUSUART();
 
