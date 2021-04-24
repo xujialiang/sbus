@@ -76,6 +76,19 @@ class SBUSUART {
         this.port.on('data', function(data) {
             if(data.byteLength == 25 && !(data[0] ^ that.START_BYTE)  && !(data[that.SBUS_FRAME_LEN-1] ^ that.END_BYTE)){
                 that.sbusFrame = data;
+            }else{
+                // 以0f开头, 但不是00结尾，且不是25字节
+                if(!(data[0] ^ that.START_BYTE)){
+                    console.log('0f开头');
+                    that.sbusFrame = data;
+                }else{
+                    // 不是0f开头，但是00结尾
+                    if(!(data[data.byteLength-1] ^ that.END_BYTE)){
+                        console.log('00结尾');
+                        that.sbusFrame = Buffer.concat([that.sbusFrame, data]);
+                        console.log('Full Frame', that.sbusFrame);
+                    }
+                }
             }
         });
 
